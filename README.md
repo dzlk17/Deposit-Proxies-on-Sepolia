@@ -35,3 +35,6 @@ Frontend starts on `http://localhost:3000`.
 | `_isAllowedCaller()` | `contracts/FundRouter.sol` | `staticcall` to `FundRouterStorage.isAllowedCaller(address)` |
 | `_isAllowedTreasury()` | `contracts/FundRouter.sol` | `staticcall` to `FundRouterStorage.isAllowedTreasury(address)` |
 | `transferFunds()` ERC20 | `contracts/FundRouter.sol` | `require(IERC20(token).transfer(treasuryAddress, amt))` |
+
+<img width="1052" height="850" alt="image" src="https://github.com/user-attachments/assets/d2a24abe-a3d3-48c6-a37b-70cc3875f684" />
+
