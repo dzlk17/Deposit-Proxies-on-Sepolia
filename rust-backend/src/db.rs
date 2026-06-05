@@ -50,6 +50,26 @@ pub fn get_all_deposits(conn: &Connection) -> Result<Vec<DepositRecord>> {
     Ok(records)
 }
 
+pub fn get_deposit_by_address(conn: &Connection, address: &str) -> Result<Option<DepositRecord>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, user_address, deposit_address, salt, status, created_at FROM deposits WHERE deposit_address = ?1",
+    )?;
+    let mut records = stmt.query_map(params![address], |row| {
+        Ok(DepositRecord {
+            id: row.get(0)?,
+            user_address: row.get(1)?,
+            deposit_address: row.get(2)?,
+            salt: row.get(3)?,
+            status: row.get(4)?,
+            created_at: row.get(5)?,
+        })
+    })?;
+    match records.next() {
+        Some(Ok(record)) => Ok(Some(record)),
+        _ => Ok(None),
+    }
+}
+
 pub fn update_status(conn: &Connection, deposit_address: &str, status: &str) -> Result<()> {
     conn.execute(
         "UPDATE deposits SET status = ?1 WHERE deposit_address = ?2",

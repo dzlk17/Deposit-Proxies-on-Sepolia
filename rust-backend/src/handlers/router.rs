@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{extract::State, Json};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 
 use crate::db;
@@ -15,21 +15,46 @@ pub struct RouterResponse {
     pub tx_hashes: Vec<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct RouterRequest {
+    pub deposit_address: Option<String>,
+}
+
 pub async fn handle_router(
     State(state): State<Arc<AppState>>,
-    _body: String,
+    Json(body): Json<RouterRequest>,
 ) -> Result<Json<RouterResponse>, ErrorResponse> {
-    let deposits = match {
-        let db = state.db.lock().unwrap();
-        db::get_all_deposits(&db)
-    } {
-        Ok(d) => d,
-        Err(e) => {
-            return Err(ErrorResponse::new(
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                format!("DB error: {}", e),
-            ));
+    let deposits: Vec<crate::models::DepositRecord> = match body.deposit_address {
+        Some(ref addr) => {
+            let db = state.db.lock().unwrap();
+            match db::get_deposit_by_address(&db, addr) {
+                Ok(Some(d)) => vec![d],
+                Ok(None) => {
+                    return Err(ErrorResponse::new(
+                        axum::http::StatusCode::NOT_FOUND,
+                        format!("Deposit {} not found", addr),
+                    ));
+                }
+                Err(e) => {
+                    return Err(ErrorResponse::new(
+                        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("DB error: {}", e),
+                    ));
+                }
+            }
         }
+        None => match {
+            let db = state.db.lock().unwrap();
+            db::get_all_deposits(&db)
+        } {
+            Ok(d) => d,
+            Err(e) => {
+                return Err(ErrorResponse::new(
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("DB error: {}", e),
+                ));
+            }
+        },
     };
 
     info!("Starting routing: {} deposits to check", deposits.len());
