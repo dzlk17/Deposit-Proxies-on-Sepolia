@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use axum::{Router, routing::{get, post}};
@@ -6,8 +7,9 @@ use ethers::signers::Signer;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
+use tokio::sync::broadcast;
 
-use rust_backend::{create2, db, eth, handlers, AppState};
+use rust_backend::{create2, db, eth, handlers, ws_handler, AppState, BalanceUpdate};
 use handlers::{deposit::handle_deposit, deposits::handle_get_deposits, router::handle_router};
 
 #[tokio::main]
@@ -57,6 +59,8 @@ async fn main() {
         )
         .init();
 
+    let (ws_tx, _) = broadcast::channel::<BalanceUpdate>(16);
+
     let init_code = create2::build_init_code(&fra);
 
     let eth_client = eth::EthClient::new(
@@ -80,12 +84,46 @@ async fn main() {
         wallet_address: wallet_arr,
         fund_router_address: fra,
         init_code,
+        ws_tx: ws_tx.clone(),
+    });
+
+    let bg_state = state.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(15));
+        loop {
+            interval.tick().await;
+
+            let deposits = {
+                let db = bg_state.db.lock().unwrap();
+                db::get_all_deposits(&db).unwrap_or_default()
+            };
+
+            let mut balances = HashMap::new();
+            for d in &deposits {
+                let balance = bg_state.eth_client.get_balance(&d.deposit_address).await.unwrap_or(0.0);
+                balances.insert(d.deposit_address.clone(), format!("{:.4}", balance));
+            }
+
+            let treasury_balance = bg_state
+                .eth_client
+                .get_balance(&format!("{:#x}", bg_state.eth_client.treasury_address))
+                .await
+                .unwrap_or(0.0);
+
+            let update = BalanceUpdate {
+                treasury_balance: format!("{:.4}", treasury_balance),
+                balances,
+            };
+
+            let _ = bg_state.ws_tx.send(update);
+        }
     });
 
     let app = Router::new()
         .route("/deposit", post(handle_deposit))
         .route("/deposits", get(handle_get_deposits))
         .route("/router", post(handle_router))
+        .route("/ws", get(ws_handler::handle_ws))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .with_state(state);

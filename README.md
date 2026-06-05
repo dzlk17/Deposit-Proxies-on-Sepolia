@@ -35,7 +35,7 @@ Frontend starts on `http://localhost:3000`.
 - ETH lands in `FundRouter` via proxy forwarding; `FundRouter` forwards from its own balance.
 - ERC20 tokens are held by `FundRouter` when `transferFunds` is called.
 - `CHAIN_ID` defaults to Sepolia (`11155111`).
-- SQLite for local persistence (swappable for Postgres).
+- SQLite for local persistence.
 
 ## TODOs Implemented
 

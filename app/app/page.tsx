@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "";
 const TREASURY_ADDRESS = process.env.NEXT_PUBLIC_TREASURY_ADDRESS || "";
+const WS_URL = API_BASE.replace(/^http(s?):\/\//, 'ws$1://') + '/ws';
 
 interface Deposit {
   id: number;
@@ -22,65 +22,45 @@ export default function Home() {
   const [routing, setRouting] = useState(false);
   const [treasuryBalance, setTreasuryBalance] = useState("0.0000");
   const [error, setError] = useState("");
-  const depositsRef = useRef(deposits);
   const routedRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    depositsRef.current = deposits;
-  }, [deposits]);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const fetchBalance = useCallback(async (address: string): Promise<string> => {
-    try {
-      const res = await fetch(RPC_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "eth_getBalance",
-          params: [address, "latest"],
-        }),
-      });
-      const data = await res.json();
-      if (data.error) return "0.0000";
-      const wei = BigInt(data.result);
-      return (Number(wei) / 1e18).toFixed(4);
-    } catch {
-      return "0.0000";
-    }
+  const connectWs = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+
+    const ws = new WebSocket(WS_URL);
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      setTreasuryBalance(data.treasury_balance);
+      setDeposits((prev) =>
+        prev.map((d) => {
+          const balance = data.balances[d.deposit_address] ?? d.balance;
+          const bal = parseFloat(balance);
+          let status = d.status;
+          if (routedRef.current.has(d.deposit_address) || d.status === "routed") {
+            status = "routed";
+          } else if (bal > 0) {
+            status = "funded";
+          } else {
+            status = "pending";
+          }
+          return { ...d, balance, status };
+        })
+      );
+    };
+
+    ws.onclose = () => {
+      wsRef.current = null;
+      reconnectTimerRef.current = setTimeout(connectWs, 3000);
+    };
+
+    ws.onerror = () => {
+      ws.close();
+    };
   }, []);
-
-  const updateBalances = useCallback(async () => {
-    const current = depositsRef.current;
-    const treasuryBal = await fetchBalance(TREASURY_ADDRESS);
-    setTreasuryBalance(treasuryBal);
-    if (current.length === 0) {
-      setTimeout(updateBalances, 500);
-      return;
-    }
-    const updated = await Promise.all(
-      current.map(async (d) => ({
-        ...d,
-        balance: await fetchBalance(d.deposit_address),
-      }))
-    );
-    const statusMap: Record<string, string> = {};
-    for (const d of updated) {
-      const bal = parseFloat(d.balance);
-      if (routedRef.current.has(d.deposit_address) || d.status === "routed") {
-        statusMap[d.deposit_address] = "routed";
-      } else if (bal > 0) {
-        statusMap[d.deposit_address] = "funded";
-      } else {
-        statusMap[d.deposit_address] = "pending";
-      }
-    }
-    setDeposits(
-      updated.map((d) => ({
-        ...d,
-        status: statusMap[d.deposit_address] || d.status,
-      }))
-    );
-  }, [fetchBalance]);
 
   useEffect(() => {
     const saved = localStorage.getItem("deposits");
@@ -109,10 +89,12 @@ export default function Home() {
   }, [deposits]);
 
   useEffect(() => {
-    updateBalances();
-    const interval = setInterval(updateBalances, 15000);
-    return () => clearInterval(interval);
-  }, [updateBalances]);
+    connectWs();
+    return () => {
+      wsRef.current?.close();
+      clearTimeout(reconnectTimerRef.current);
+    };
+  }, [connectWs]);
 
   const getNextDeposit = async () => {
     setLoading(true);
@@ -332,10 +314,9 @@ export default function Home() {
                                     );
                                   }
                                   routedRef.current.add(dep.deposit_address);
-                                  const freshBalance = await fetchBalance(dep.deposit_address);
                                   setDeposits(prev => prev.map(d =>
                                     d.deposit_address === dep.deposit_address
-                                      ? { ...d, status: "routed", balance: freshBalance }
+                                      ? { ...d, status: "routed" }
                                       : d
                                   ));
                                 } catch (e: unknown) {
@@ -361,7 +342,7 @@ export default function Home() {
           </div>
           {deposits.length > 0 && (
             <div className="px-4 py-2 text-xs text-zinc-400 dark:text-zinc-600 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/30">
-              Auto-refreshing balances every 15s
+              Live balance updates via WebSocket
             </div>
           )}
         </div>
