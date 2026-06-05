@@ -19,6 +19,16 @@ pnpm dev
 ```
 Frontend starts on `http://localhost:3000`.
 
+## Deployment (Sepolia)
+
+| Contract | Address |
+|----------|---------|
+| DeterministicProxyDeployer | `0xCdF6E4419FdDCBca86C00448ed369EF21453A4D9` |
+| FundRouter | `0xA798a7e85FDDef5eA0c71b06987D3d149B506804` |
+| FundRouterStorage | `0x53eB9b75B175636584B12fAcb5152e4b78e2511f` |
+| Treasury | `0x3367436E1D23f6e562924D69A7785848b2A0348c` |
+| Deployer | `0x83613e3B88e380fE43f8D7A911B67a791372a9dC` |
+
 ## Assumptions
 
 - Minimal proxy forwards calls & ETH to `FUND_ROUTER_ADDRESS` via `delegatecall` (EIP-1167).
@@ -36,5 +46,11 @@ Frontend starts on `http://localhost:3000`.
 | `_isAllowedTreasury()` | `contracts/FundRouter.sol` | `staticcall` to `FundRouterStorage.isAllowedTreasury(address)` |
 | `transferFunds()` ERC20 | `contracts/FundRouter.sol` | `require(IERC20(token).transfer(treasuryAddress, amt))` |
 
-<img width="1052" height="850" alt="image" src="https://github.com/user-attachments/assets/d2a24abe-a3d3-48c6-a37b-70cc3875f684" />
+## Screenshot
+
+<p align="center">
+  <img width="1052" alt="Deposit Proxies Dashboard" src="https://github.com/user-attachments/assets/d2a24abe-a3d3-48c6-a37b-70cc3875f684" />
+  <br/>
+  <em>Frontend dashboard showing deposit addresses, balances, and treasury status.</em>
+</p>
 
