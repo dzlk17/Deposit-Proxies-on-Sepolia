@@ -1,9 +1,8 @@
-use ethers::middleware::NonceManagerMiddleware;
 use ethers::prelude::*;
 use std::sync::Arc;
 
 type EthResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
-type TxClient = NonceManagerMiddleware<SignerMiddleware<Arc<Provider<Http>>, LocalWallet>>;
+type TxClient = SignerMiddleware<Arc<Provider<Http>>, LocalWallet>;
 
 abigen!(
     IDeterministicProxyDeployer,
@@ -24,7 +23,6 @@ abigen!(
 pub struct EthClient {
     pub provider: Arc<Provider<Http>>,
     pub wallet: LocalWallet,
-    pub deployer_address: Address,
     pub fund_router_address: Address,
     pub treasury_address: Address,
     pub chain_id: u64,
@@ -41,18 +39,16 @@ impl EthClient {
     ) -> EthResult<Self> {
         let provider = Arc::new(Provider::<Http>::try_from(rpc_url)?);
         let wallet: LocalWallet = private_key.parse::<LocalWallet>()?.with_chain_id(chain_id);
-        let deployer_address = wallet.address();
         let fund_router_address: Address = fund_router_address.parse()?;
         let treasury_address: Address = treasury_address.parse()?;
 
-        let signer =
-            SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(chain_id));
-        let client = Arc::new(NonceManagerMiddleware::new(signer, deployer_address));
+        let client = Arc::new(
+            SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(chain_id))
+        );
 
         Ok(Self {
             provider,
             wallet,
-            deployer_address,
             fund_router_address,
             treasury_address,
             chain_id,

@@ -17,12 +17,13 @@ interface Deposit {
 
 export default function Home() {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
-  const [userAddress, setUserAddress] = useState("0x3367436E1D23f6e562924D69A7785848b2A0348c");
+  const [userAddress, setUserAddress] = useState("0xabc...");
   const [loading, setLoading] = useState(false);
   const [routing, setRouting] = useState(false);
   const [treasuryBalance, setTreasuryBalance] = useState("0.0000");
   const [error, setError] = useState("");
   const depositsRef = useRef(deposits);
+  const routedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     depositsRef.current = deposits;
   }, [deposits]);
@@ -65,7 +66,7 @@ export default function Home() {
     const statusMap: Record<string, string> = {};
     for (const d of updated) {
       const bal = parseFloat(d.balance);
-      if (d.status === "routed") {
+      if (routedRef.current.has(d.deposit_address) || d.status === "routed") {
         statusMap[d.deposit_address] = "routed";
       } else if (bal > 0) {
         statusMap[d.deposit_address] = "funded";
@@ -157,8 +158,10 @@ export default function Home() {
         throw new Error(err.error || "Failed to route funds");
       }
       const data = await res.json();
-      setDeposits(prev => prev.map(d => ({...d, status: "routed"})));
-      await updateBalances();
+      setDeposits(prev => {
+        prev.forEach(d => routedRef.current.add(d.deposit_address));
+        return prev.map(d => ({...d, status: "routed"}));
+      });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -318,7 +321,9 @@ export default function Home() {
                                     headers: {
                                       "Content-Type": "application/json",
                                     },
-                                    body: "{}",
+                                    body: JSON.stringify({
+                                      deposit_address: dep.deposit_address,
+                                    }),
                                   });
                                   if (!res.ok) {
                                     const err = await res.json();
@@ -326,9 +331,13 @@ export default function Home() {
                                       err.error || "Route failed"
                                     );
                                   }
-                                  const data = await res.json();
-                                  setDeposits(prev => prev.map(d => ({...d, status: "routed"})));
-                                  await updateBalances();
+                                  routedRef.current.add(dep.deposit_address);
+                                  const freshBalance = await fetchBalance(dep.deposit_address);
+                                  setDeposits(prev => prev.map(d =>
+                                    d.deposit_address === dep.deposit_address
+                                      ? { ...d, status: "routed", balance: freshBalance }
+                                      : d
+                                  ));
                                 } catch (e: unknown) {
                                   setError(
                                     e instanceof Error
@@ -337,9 +346,10 @@ export default function Home() {
                                   );
                                 }
                               }}
-                              className="px-2.5 py-1 rounded text-xs font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors"
+                              disabled={dep.status === "routed" || bal <= 0}
+                              className="px-2.5 py-1 rounded text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed enabled:bg-zinc-100 enabled:hover:bg-zinc-200 dark:enabled:bg-zinc-800 dark:enabled:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
                             >
-                              Route
+                              {dep.status === "routed" ? "Routed" : "Route"}
                             </button>
                         </td>
                       </tr>
