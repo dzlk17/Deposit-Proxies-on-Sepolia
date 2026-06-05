@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL!;
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL!;
-const TREASURY_ADDRESS = process.env.NEXT_PUBLIC_TREASURY_ADDRESS!;
+const TREASURY_ADDRESS = process.env.NEXT_PUBLIC_TREASURY_ADDRESS || "";
 
 interface Deposit {
   id: number;
