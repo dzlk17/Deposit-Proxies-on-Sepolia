@@ -77,7 +77,7 @@ export default function Home() {
             deposit_address: d.deposit_address,
             salt: d.salt,
             status: d.status,
-            balance: "0.0000",
+            balance: d.balance ?? "0.0000",
           })));
         }
       })
