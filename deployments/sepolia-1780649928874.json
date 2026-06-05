@@ -1,0 +1,9 @@
+{
+  "network": "sepolia",
+  "deployer": "0x83613e3B88e380fE43f8D7A911B67a791372a9dC",
+  "FundRouterStorage": "0x53eB9b75B175636584B12fAcb5152e4b78e2511f",
+  "FundRouter": "0xA798a7e85FDDef5eA0c71b06987D3d149B506804",
+  "DeterministicProxyDeployer": "0xCdF6E4419FdDCBca86C00448ed369EF21453A4D9",
+  "treasury": "0x3367436E1D23f6e562924D69A7785848b2A0348c",
+  "timestamp": "2026-06-05T08:58:48.873Z"
+}

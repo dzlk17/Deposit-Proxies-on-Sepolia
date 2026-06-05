@@ -6,3 +6,5 @@ coverage/
 coverage.json
 .env
 typechain-types/
+rust-backend/target/
+rust-backend/data.db

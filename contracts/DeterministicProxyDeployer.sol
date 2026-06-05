@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 /// @title DeterministicProxyDeployer (skeleton)
-/// @notice Deploys minimal proxies that forward to
-// FUND_ROUTER_ADDRESS via CREATE2.
+/// @notice Deploys minimal proxies that forward to FUND_ROUTER_ADDRESS via CREATE2.
 /// @dev A few pieces are deliberately stubbed with TODOs.
 contract DeterministicProxyDeployer {
     /// @dev Replace at deployment time, or make settable in a constructor.
@@ -15,17 +14,21 @@ contract DeterministicProxyDeployer {
     }
     // ---- Bytecode helpers ----------------------------------------------------
     /// @notice Returns the init code used for CREATE2 deployments.
-    /// @dev TODO: Candidate must implement this to return a minimal forwarding proxy
+    /// @dev Candidate must implement this to return a minimal forwarding proxy
     /// whose *runtime* code forwards calls (and ETH) to FUND_ROUTER_ADDRESS.
     /// Hints welcome: EIP-1167 style or custom minimal runtime with CALL.
     function _proxyInitCode() internal view returns (bytes memory) {
-        // TODO: return init-code bytes that deploy runtime forwarding to FUND_ROUTER_ADDRESS
-        // The original snippet had a hex string with ${FUND_ROUTER_ADDRESS} spliced in.
-        // For clarity here, either:
-        // - build it with abi.encodePacked(prefix, FUND_ROUTER_ADDRESS, suffix), or
-        // - implement an EIP-1167 minimal proxy pointing at FUND_ROUTER_ADDRESS.
-        // Revert for now so it compiles.
-        revert InvalidBytecode();
+        //EIP-1167 minimal proxy pointing at FUND_ROUTER_ADDRESS.
+        return abi.encodePacked(
+        // minimal proxy creation bytecode (EIP-1167)
+            // init code
+            hex"3d602d80600a3d3981f3"
+            // rutnime proxy code
+            hex"363d3d373d3d3d363d73",
+            FUND_ROUTER_ADDRESS,
+            // delegatecall and return
+            hex"5af43d82803e903d91602b57fd5bf3"
+        );
     }
     /// @notice Per-caller salt derivation to avoid collisions across different users.
     /// @dev Candidates can keep this as-is or modify in place if they justify.

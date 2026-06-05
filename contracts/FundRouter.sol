@@ -6,6 +6,7 @@ interface IERC20 {
         (bool);
     function balanceOf(address who) external view returns (uint256);
 }
+
 /// @title FundRouter (skeleton)
 /// @notice Pull ETH held by a proxy and forward it (and optional
 /// ERC20s) to a treasury.
@@ -23,23 +24,31 @@ contract FundRouter is IFundRouter {
         require(storageContract != address(0), "storage=0");
         STORAGE = storageContract;
     }
+
     /// @dev Minimal interface to the storage contract.
-    function _isAllowedCaller(address a) internal view returns (bool
-        ok) {
-        // TODO: call FundRouterStorage.isAllowedCaller(a)
-        // hint: (bool s, bytes memory r) =
-        STORAGE.staticcall(abi.encodeWithSignature("isAllowedCaller(address)",
-            a));
-        // then decode (bool).
-        // For now, pretend false to force candidate to implement.
-        ok = false;
+    function _isAllowedCaller(address a) internal view returns (bool ok) {
+        (bool s, bytes memory r) = STORAGE.staticcall(
+            abi.encodeWithSignature("isAllowedCaller(address)", a)
+        );
+
+        if (!s || r.length == 0) {
+            return false;
+        }
+
+        ok = abi.decode(r, (bool));
     }
-    function _isAllowedTreasury(address a) internal view returns (bool
-        ok) {
-        // TODO: call FundRouterStorage.isAllowedTreasury(a) and
-        // return result.
-        ok = false;
+
+    function _isAllowedTreasury(address a) internal view returns (bool ok) {
+        (bool s, bytes memory r) = STORAGE.staticcall(
+            abi.encodeWithSignature("isAllowedTreasury(address)", a)
+        );
+
+        if (!s || r.length == 0) {
+            return false;
+        }
+        ok = abi.decode(r, (bool));
     }
+
     /// @inheritdoc IFundRouter
     function transferFunds(
         uint256 etherAmount,
@@ -48,15 +57,11 @@ contract FundRouter is IFundRouter {
         address payable treasuryAddress
     ) external override {
         if (treasuryAddress == address(0)) revert ZeroTreasury();
-        // TODO: enforce that msg.sender is an allowed caller
-        if (!_isAllowedCaller(msg.sender)) revert
-            NotAuthorizedCaller();
-        // TODO: enforce that treasury is allowed
-        if (!_isAllowedTreasury(treasuryAddress)) revert
-            TreasuryNotAllowed();
+        if (!_isAllowedCaller(msg.sender)) revert NotAuthorizedCaller();
+        if (!_isAllowedTreasury(treasuryAddress)) revert TreasuryNotAllowed();
         if (tokens.length != amounts.length) revert LengthMismatch();
-        // ---- ETH routing (from this contract's balance) -----------
-        // --------
+
+        // ---- ETH routing (from this contract's balance) -------------------
         // Assumption: ETH has already been sent to this router (e.g.,
         // via the proxy's fallback)
         // or msg.sender has ETH and is delegatecalling; keep it
@@ -69,22 +74,15 @@ contract FundRouter is IFundRouter {
                 ("");
             if (!ok) revert EthSendFailed();
         }
-        // ---- ERC20 routing (optional) -----------------------------
-        // --------
+        // ---- ERC20 routing (optional) -------------------------------------
         for (uint256 i = 0; i < tokens.length; i++) {
             address token = tokens[i];
             uint256 amt = amounts[i];
             if (amt == 0) continue;
-            // TODO: implement ERC20 transfer out.
-            // Choices:
-            // - If tokens sit here, do
-            // IERC20(token).transfer(treasuryAddress, amt).
-            // - If tokens sit on msg.sender, you'd need transferFrom
-            // and prior approval (not defined on IERC20 above).
-            // Keep it simple: assume tokens are already held here.
-            // For now we leave as a stub—candidate should implement.
-            // e.g. require(IERC20(token).transfer(treasuryAddress,
-            // amt), "ERC20 transfer failed");
+            require(
+                IERC20(token).transfer(treasuryAddress, amt),
+                "ERC20 transfer failed"
+            );
         }
     }
     // Accept ETH so proxies can push value here.
