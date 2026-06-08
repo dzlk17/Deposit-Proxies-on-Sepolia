@@ -54,3 +54,13 @@ Frontend starts on `http://localhost:3000`.
   <em>Frontend dashboard showing deposit addresses, balances, and treasury status.</em>
 </p>
 
+## Potential Improvements
+
+### Balance Fetching — Unnecessary RPC Load
+
+**Problem:** The background polling loop (`main.rs:96-105`) and the WebSocket connection handler (`ws_handler.rs:24-33`) fetch ETH balances for **all** deposit addresses in the database every 15 seconds — including addresses whose status is already `"routed"`. Once a deposit has been routed, its proxy is deployed and its ETH has been forwarded to the treasury, so its balance will always be 0. These RPC calls are wasted and compound linearly as more deposits are processed.
+
+**Proposed fix:** Filter out routed deposits when fetching balances:
+
+1. Add a `get_pending_deposits()` function in `db.rs` that queries `SELECT ... WHERE status != 'routed'`.
+2. Replace `get_all_deposits()` with `get_pending_deposits()` in `ws_handler.rs`.
